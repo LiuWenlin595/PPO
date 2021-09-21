@@ -39,7 +39,7 @@ def train():
     has_continuous_action_space = False  # 连续动作为True否则False
 
     max_ep_len = 1000                   # 一个episode的最多timesteps
-    max_training_timesteps = int(3e6)   # 当 timesteps > max_training_timesteps 时停止循环
+    max_training_timesteps = 50000 # int(3e6)   # 当 timesteps > max_training_timesteps 时停止循环
 
     # print/log freq 需要是 max_ep_len 的整数倍
     print_freq = max_ep_len * 10        # 每隔 print_freq 打印 average reward
@@ -53,7 +53,7 @@ def train():
 
     """PPO超参数"""
     update_timestep = max_ep_len * 4    # 每隔 update_timestep 执行一次 update policy
-    k_epochs = 80               # 一个 update policy 中更新k轮
+    k_epochs = 80                       # 一个 update policy 中更新k轮
 
     eps_clip = 0.2                  # clip参数
     gamma = 0.99                    # 折扣因子
@@ -184,7 +184,7 @@ def train():
         state = env.reset()
         current_ep_reward = 0
 
-        for t in range(1, max_ep_len+1):
+        for _ in range(max_ep_len):
             # 环境交互
             action = ppo_agent.select_action(state)
             state, reward, done, _ = env.step(action)
@@ -194,6 +194,11 @@ def train():
             # buffer 记录数据
             ppo_agent.buffer.rewards.append(reward)
             ppo_agent.buffer.is_terminals.append(done)
+            if True:
+                # 额外存储s_done的状态值函数
+                state = torch.FloatTensor(state).to(device)
+                state_value = ppo_agent.policy.critic(state)
+                ppo_agent.buffer.terminal_state_value.append(state_value) 
 
             time_step += 1
             current_ep_reward += reward
@@ -239,11 +244,7 @@ def train():
                 print("Elapsed Time  : ", datetime.now().replace(microsecond=0) - start_time)
                 print("--------------------------------------------------------------------------------------------")
 
-            if done:
-                # 额外存储s_done的状态值函数
-                state = torch.FloatTensor(state).to(device)
-                state_value = ppo_agent.policy.critic(state)
-                ppo_agent.buffer.terminal_state_value.append(state_value)
+            if done: # 结束episode
                 break
 
         print_running_reward += current_ep_reward

@@ -167,7 +167,7 @@ class PPO:
 
         self.policy_old = ActorCritic(state_dim, action_dim, has_continuous_action_space, action_std_init,
                                       use_orth=False).to(device)
-        self.policy_old.load_state_dict(self.policy.state_dict())
+        self.policy_old.load_state_dict(self.policy.state_dict())  # 复制网络
 
         self.critic_coef = critic_coef
         self.entropy_coef = entropy_coef
@@ -219,13 +219,15 @@ class PPO:
             return action.item()
 
     def update(self):
-
         # Monte Carlo estimate of returns
         rewards = []
         """GAE计算 rewards = V + A(GAE)"""
         if self.use_gae:
             gae = 0
-            for step in reversed(range(len(self.buffer.rewards))):
+            print(len(self.buffer.is_terminals))
+            print(len(self.buffer.terminal_state_value))
+            print(len(self.buffer.actions))
+            for step in range(len(self.buffer.rewards)-1, -1, -1):
                 # 计算某一个episode最后一步的gae
                 if self.buffer.is_terminals[step]:
                     gae = 0
@@ -255,7 +257,7 @@ class PPO:
 
         """trick2, reward normalizing"""
         rewards = torch.tensor(rewards, dtype=torch.float32).to(device)
-        rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-7)
+        rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-7)  # TODO, 改成running reward
 
         # list 转 tensor
         old_states = torch.squeeze(torch.stack(self.buffer.states, dim=0)).detach().to(device)
