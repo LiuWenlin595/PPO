@@ -8,7 +8,7 @@ from torch.distributions import Categorical
 device = torch.device('cpu')
 
 if torch.cuda.is_available():
-    device = torch.device('cuda:0') 
+    device = torch.device('cuda:0')
     torch.cuda.empty_cache()
     print("Device set to : " + str(torch.cuda.get_device_name(device)))
 else:
@@ -49,53 +49,58 @@ class ActorCritic(nn.Module):
 
         if has_continuous_action_space:
             self.action_dim = action_dim
-            self.action_var = torch.full((action_dim,), action_std_init * action_std_init).to(device)
+            self.action_var = torch.full(
+                (action_dim,), action_std_init * action_std_init).to(device)
 
         """trick3, 正交初始化"""
         """trick8, tanh做激活函数"""
         if use_orth:
-            init_ = lambda m: init(m, nn.init.orthogonal_, lambda x: nn.init.
-                                   constant_(x, 0), np.sqrt(2))
+            def init_(m): return init(m, nn.init.orthogonal_, lambda x: nn.init.
+                                      constant_(x, 0), np.sqrt(2))
         else:
-            init_ = lambda m: m
+            def init_(m): return m
 
         # actor
         if has_continuous_action_space:
             self.actor = nn.Sequential(
-                            init_(nn.Linear(state_dim, 64)),
-                            nn.Tanh(),
-                            init_(nn.Linear(64, 64)),
-                            nn.Tanh(),
-                            init_(nn.Linear(64, action_dim)),
-                            nn.Tanh()
-                        )
+                init_(nn.Linear(state_dim, 64)),
+                nn.Tanh(),
+                init_(nn.Linear(64, 64)),
+                nn.Tanh(),
+                init_(nn.Linear(64, action_dim)),
+                nn.Tanh()
+            )
         else:
             self.actor = nn.Sequential(
-                            init_(nn.Linear(state_dim, 64)),
-                            nn.Tanh(),
-                            init_(nn.Linear(64, 64)),
-                            nn.Tanh(),
-                            init_(nn.Linear(64, action_dim)),
-                            nn.Softmax(dim=-1)
-                        )
+                init_(nn.Linear(state_dim, 64)),
+                nn.Tanh(),
+                init_(nn.Linear(64, 64)),
+                nn.Tanh(),
+                init_(nn.Linear(64, action_dim)),
+                nn.Softmax(dim=-1)
+            )
 
         # critic
         self.critic = nn.Sequential(
-                        init_(nn.Linear(state_dim, 64)),
-                        nn.Tanh(),
-                        init_(nn.Linear(64, 64)),
-                        nn.Tanh(),
-                        init_(nn.Linear(64, 1))
-                    )
-        
+            init_(nn.Linear(state_dim, 64)),
+            nn.Tanh(),
+            init_(nn.Linear(64, 64)),
+            nn.Tanh(),
+            init_(nn.Linear(64, 1))
+        )
+
     def set_action_std(self, new_action_std):
         """设置方差"""
         if self.has_continuous_action_space:
-            self.action_var = torch.full((self.action_dim,), new_action_std * new_action_std).to(device)
+            self.action_var = torch.full(
+                (self.action_dim,), new_action_std * new_action_std).to(device)
         else:
-            print("--------------------------------------------------------------------------------------------")
-            print("WARNING : Calling ActorCritic::set_action_std() on discrete action space policy")
-            print("--------------------------------------------------------------------------------------------")
+            print(
+                "--------------------------------------------------------------------------------------------")
+            print(
+                "WARNING : Calling ActorCritic::set_action_std() on discrete action space policy")
+            print(
+                "--------------------------------------------------------------------------------------------")
 
     def forward(self):
         raise NotImplementedError
@@ -112,18 +117,18 @@ class ActorCritic(nn.Module):
 
         action = dist.sample()
         action_logprob = dist.log_prob(action)
-        
+
         return action.detach(), action_logprob.detach()
 
     def evaluate(self, state, action):
         """actor + critic, 输入状态, 输出动作+动作值函数+熵"""
         if self.has_continuous_action_space:
             action_mean = self.actor(state)
-            
+
             action_var = self.action_var.expand_as(action_mean)
             cov_mat = torch.diag_embed(action_var).to(device)
             dist = MultivariateNormal(action_mean, cov_mat)
-            
+
             # 输出单动作的环境需要特殊处理一下数据
             if self.action_dim == 1:
                 action = action.reshape(-1, self.action_dim)
@@ -134,7 +139,7 @@ class ActorCritic(nn.Module):
         action_logprobs = dist.log_prob(action)
         dist_entropy = dist.entropy()
         state_values = self.critic(state)
-        
+
         return action_logprobs, state_values, dist_entropy
 
 
@@ -153,16 +158,16 @@ class PPO:
 
         self.use_gae = use_gae
         self.gae_lambda = gae_lambda
-        
+
         self.buffer = RolloutBuffer()
 
         # 需要用到两个网络, 因为策略比
         self.policy = ActorCritic(state_dim, action_dim, has_continuous_action_space, action_std_init,
                                   use_orth=False).to(device)
         self.optimizer = torch.optim.Adam([
-                        {'params': self.policy.actor.parameters(), 'lr': lr_actor},
-                        {'params': self.policy.critic.parameters(), 'lr': lr_critic}
-                    ])
+            {'params': self.policy.actor.parameters(), 'lr': lr_actor},
+            {'params': self.policy.critic.parameters(), 'lr': lr_critic}
+        ])
         self.max_grad_norm = 1
 
         self.policy_old = ActorCritic(state_dim, action_dim, has_continuous_action_space, action_std_init,
@@ -175,15 +180,18 @@ class PPO:
         self.MseLoss = nn.MSELoss()
 
     def set_action_std(self, new_action_std):
-        
+
         if self.has_continuous_action_space:
             self.action_std = new_action_std
             self.policy.set_action_std(new_action_std)
             self.policy_old.set_action_std(new_action_std)
         else:
-            print("--------------------------------------------------------------------------------------------")
-            print("WARNING : Calling PPO::set_action_std() on discrete action space policy")
-            print("--------------------------------------------------------------------------------------------")
+            print(
+                "--------------------------------------------------------------------------------------------")
+            print(
+                "WARNING : Calling PPO::set_action_std() on discrete action space policy")
+            print(
+                "--------------------------------------------------------------------------------------------")
 
     def decay_action_std(self, action_std_decay_rate, min_action_std):
         print("--------------------------------------------------------------------------------------------")
@@ -192,12 +200,14 @@ class PPO:
             self.action_std = round(self.action_std, 4)
             if self.action_std <= min_action_std:
                 self.action_std = min_action_std
-                print("setting actor output action_std to min_action_std : ", self.action_std)
+                print(
+                    "setting actor output action_std to min_action_std : ", self.action_std)
             else:
                 print("setting actor output action_std to : ", self.action_std)
             self.set_action_std(self.action_std)
         else:
-            print("WARNING : Calling PPO::decay_action_std() on discrete action space policy")
+            print(
+                "WARNING : Calling PPO::decay_action_std() on discrete action space policy")
         print("--------------------------------------------------------------------------------------------")
 
     def select_action(self, state):
@@ -224,24 +234,22 @@ class PPO:
         """GAE计算 rewards = V + A(GAE)"""
         if self.use_gae:
             gae = 0
-            print(len(self.buffer.is_terminals))
-            print(len(self.buffer.terminal_state_value))
-            print(len(self.buffer.actions))
             for step in range(len(self.buffer.rewards)-1, -1, -1):
                 # 计算某一个episode最后一步的gae
                 if self.buffer.is_terminals[step]:
                     gae = 0
                     # 因为buffer存的是s_i, a_i, V_i, r_i, done_i, 最后一步得到的V(s_i+1)会记录进buffer.terminal_state_value
                     next_value = self.buffer.terminal_state_value.pop()
-                    delta = self.buffer.rewards[step] + self.gamma * next_value - self.buffer.state_value[step]
+                    delta = self.buffer.rewards[step] + self.gamma * \
+                        next_value - self.buffer.state_value[step]
                 elif step == len(self.buffer.rewards) - 1:
                     # 很无奈, 最后一步必须拿出来单独处理, 因为没办法计算它的V', 只能用V近似代替
                     # 后续可以重新写一下buffer, 整成s_i+1, a_i, V_i, r_i, done_i的形式
                     delta = self.buffer.rewards[step] + self.gamma * self.buffer.state_value[step]\
-                            - self.buffer.state_value[step]
+                        - self.buffer.state_value[step]
                 else:
                     delta = self.buffer.rewards[step] + self.gamma * self.buffer.state_value[step+1] \
-                            - self.buffer.state_value[step]
+                        - self.buffer.state_value[step]
 
                 gae = gae + self.gamma * self.gae_lambda * delta
                 rewards.insert(0, gae + self.buffer.state_value[step])
@@ -257,42 +265,52 @@ class PPO:
 
         """trick2, reward normalizing"""
         rewards = torch.tensor(rewards, dtype=torch.float32).to(device)
-        rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-7)  # TODO, 改成running reward
+        rewards = (rewards - rewards.mean()) / \
+            (rewards.std() + 1e-7)  # TODO, 改成running reward
 
         # list 转 tensor
-        old_states = torch.squeeze(torch.stack(self.buffer.states, dim=0)).detach().to(device)
-        old_actions = torch.squeeze(torch.stack(self.buffer.actions, dim=0)).detach().to(device)
-        old_logprobs = torch.squeeze(torch.stack(self.buffer.logprobs, dim=0)).detach().to(device)
+        old_states = torch.squeeze(torch.stack(
+            self.buffer.states, dim=0)).detach().to(device)
+        old_actions = torch.squeeze(torch.stack(
+            self.buffer.actions, dim=0)).detach().to(device)
+        old_logprobs = torch.squeeze(torch.stack(
+            self.buffer.logprobs, dim=0)).detach().to(device)
 
         # 进行k轮update policy
         for _ in range(self.k_epochs):
 
-            logprobs, state_values, dist_entropy = self.policy.evaluate(old_states, old_actions)
+            logprobs, state_values, dist_entropy = self.policy.evaluate(
+                old_states, old_actions)
 
             # 处理state_values的张量维度和reward相同
             state_values = torch.squeeze(state_values)
-            
+
             # 计算策略比
             ratios = torch.exp(logprobs - old_logprobs.detach())
 
             # 计算PPO的约束loss
-            advantages = rewards - state_values.detach()   
+            advantages = rewards - state_values.detach()
             surr1 = ratios * advantages
-            surr2 = torch.clamp(ratios, 1-self.eps_clip, 1+self.eps_clip) * advantages
+            surr2 = torch.clamp(ratios, 1-self.eps_clip,
+                                1+self.eps_clip) * advantages
 
             """trick1, value function clipping"""
             if self.use_value_clip:
                 # 0.5就相当于epsilon, 是我瞎写的, 需要根据实际任务而定
-                _, old_state_values, _ = self.policy_old.evaluate(old_states, old_actions)
+                _, old_state_values, _ = self.policy_old.evaluate(
+                    old_states, old_actions)
                 old_state_values = torch.squeeze(old_state_values)
-                value_clip = old_state_values + torch.clamp(state_values - old_state_values, -0.5, 0.5)
-                critic_loss = torch.min(self.MseLoss(state_values, rewards), self.MseLoss(value_clip, rewards))
+                value_clip = old_state_values + \
+                    torch.clamp(state_values - old_state_values, -0.5, 0.5)
+                critic_loss = torch.min(self.MseLoss(
+                    state_values, rewards), self.MseLoss(value_clip, rewards))
             else:
                 critic_loss = self.MseLoss(state_values, rewards)
 
             # 总的loss = actor loss + critic loss + entropy loss
-            loss = -torch.min(surr1, surr2) + self.critic_coef * critic_loss - self.entropy_coef * dist_entropy
-            
+            loss = -torch.min(surr1, surr2) + self.critic_coef * \
+                critic_loss - self.entropy_coef * dist_entropy
+
             # 梯度更新
             self.optimizer.zero_grad()
             loss.mean().backward()
@@ -300,7 +318,7 @@ class PPO:
             # max_grad_norm的值也是我瞎写的
             # nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
             self.optimizer.step()
-            
+
         # 将新的权重赋值给policy old
         self.policy_old.load_state_dict(self.policy.state_dict())
 
@@ -313,5 +331,7 @@ class PPO:
 
     # 加载模型
     def load(self, checkpoint_path):
-        self.policy_old.load_state_dict(torch.load(checkpoint_path, map_location=lambda storage, loc: storage))
-        self.policy.load_state_dict(torch.load(checkpoint_path, map_location=lambda storage, loc: storage))
+        self.policy_old.load_state_dict(torch.load(
+            checkpoint_path, map_location=lambda storage, loc: storage))
+        self.policy.load_state_dict(torch.load(
+            checkpoint_path, map_location=lambda storage, loc: storage))

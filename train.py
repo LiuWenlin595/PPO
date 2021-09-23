@@ -32,14 +32,14 @@ def update_linear_schedule(optimizer, timesteps, total_timesteps):
 
 
 def train():
-
     """环境超参数"""
     env_name = "CartPole-v1"
 
     has_continuous_action_space = False  # 连续动作为True否则False
 
     max_ep_len = 1000                   # 一个episode的最多timesteps
-    max_training_timesteps = 50000 # int(3e6)   # 当 timesteps > max_training_timesteps 时停止循环
+    # int(3e6)   # 当 timesteps > max_training_timesteps 时停止循环
+    max_training_timesteps = 50000
 
     # print/log freq 需要是 max_ep_len 的整数倍
     print_freq = max_ep_len * 10        # 每隔 print_freq 打印 average reward
@@ -47,7 +47,8 @@ def train():
     save_model_freq = int(1e5)          # 每隔 save_model_freq 保存一次模型
 
     action_std = 0.6                    # Multivariate Normal动作分布的初始标准差
-    action_std_decay_rate = 0.05        # 标准差的线性衰减步长 (action_std = action_std - action_std_decay_rate)
+    # 标准差的线性衰减步长 (action_std = action_std - action_std_decay_rate)
+    action_std_decay_rate = 0.05
     min_action_std = 0.1                # 最小动作标准差, 当 action_std <= min_action_std 时停止衰减
     action_std_decay_freq = int(2.5e5)  # 每隔 action_std_decay_freq 衰减一次
 
@@ -110,7 +111,8 @@ def train():
     if not os.path.exists(directory):
         os.makedirs(directory)
 
-    checkpoint_path = directory + "PPO_{}_{}_{}.pth".format(env_name, random_seed, run_num_pretrained)
+    checkpoint_path = directory + \
+        "PPO_{}_{}_{}.pth".format(env_name, random_seed, run_num_pretrained)
     print("save checkpoint path : " + checkpoint_path)
 
     """打印所有超参数"""
@@ -119,7 +121,8 @@ def train():
     print("max timesteps per episode : ", max_ep_len)
     print("model saving frequency : " + str(save_model_freq) + " timesteps")
     print("log frequency : " + str(log_freq) + " timesteps")
-    print("printing average reward over episodes in last : " + str(print_freq) + " timesteps")
+    print("printing average reward over episodes in last : " +
+          str(print_freq) + " timesteps")
     print("--------------------------------------------------------------------------------------------")
     print("state space dimension : ", state_dim)
     print("action space dimension : ", action_dim)
@@ -130,7 +133,8 @@ def train():
         print("starting std of action distribution : ", action_std)
         print("decay rate of std of action distribution : ", action_std_decay_rate)
         print("minimum std of action distribution : ", min_action_std)
-        print("decay frequency of std of action distribution : " + str(action_std_decay_freq) + " timesteps")
+        print("decay frequency of std of action distribution : " +
+              str(action_std_decay_freq) + " timesteps")
     else:
         print("Initializing a discrete action space policy")
     print("--------------------------------------------------------------------------------------------")
@@ -179,7 +183,8 @@ def train():
 
         """trick4, 学习率下降而非固定不变"""
         if use_linear_lr_decay:
-            update_linear_schedule(ppo_agent.optimizer, time_step, max_training_timesteps)
+            update_linear_schedule(ppo_agent.optimizer,
+                                   time_step, max_training_timesteps)
 
         state = env.reset()
         current_ep_reward = 0
@@ -194,11 +199,11 @@ def train():
             # buffer 记录数据
             ppo_agent.buffer.rewards.append(reward)
             ppo_agent.buffer.is_terminals.append(done)
-            if True:
+            if done:
                 # 额外存储s_done的状态值函数
                 state = torch.FloatTensor(state).to(device)
                 state_value = ppo_agent.policy.critic(state)
-                ppo_agent.buffer.terminal_state_value.append(state_value) 
+                ppo_agent.buffer.terminal_state_value.append(state_value)
 
             time_step += 1
             current_ep_reward += reward
@@ -209,7 +214,8 @@ def train():
 
             # 对于连续动作, 隔段时间降低动作标准差, 保证策略收敛
             if has_continuous_action_space and time_step % action_std_decay_freq == 0:
-                ppo_agent.decay_action_std(action_std_decay_rate, min_action_std)
+                ppo_agent.decay_action_std(
+                    action_std_decay_rate, min_action_std)
 
             # log 记录 average reward
             if time_step % log_freq == 0:
@@ -217,7 +223,8 @@ def train():
                 log_avg_reward = log_running_reward / log_running_episodes
                 log_avg_reward = round(log_avg_reward, 4)
 
-                log_f.write('{},{},{}\n'.format(i_episode, time_step, log_avg_reward))
+                log_f.write('{},{},{}\n'.format(
+                    i_episode, time_step, log_avg_reward))
                 log_f.flush()
 
                 log_running_reward = 0
@@ -237,14 +244,17 @@ def train():
 
             # 保存模型
             if time_step % save_model_freq == 0:
-                print("--------------------------------------------------------------------------------------------")
+                print(
+                    "--------------------------------------------------------------------------------------------")
                 print("saving model at : " + checkpoint_path)
                 ppo_agent.save(checkpoint_path)
                 print("model saved")
-                print("Elapsed Time  : ", datetime.now().replace(microsecond=0) - start_time)
-                print("--------------------------------------------------------------------------------------------")
+                print("Elapsed Time  : ", datetime.now().replace(
+                    microsecond=0) - start_time)
+                print(
+                    "--------------------------------------------------------------------------------------------")
 
-            if done: # 结束episode
+            if done:  # 结束episode
                 break
 
         print_running_reward += current_ep_reward
