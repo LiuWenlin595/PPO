@@ -62,6 +62,8 @@ def train():
 
     use_gae = True  # 是否使用GAE
     gae_lambda = 0.95  # gae的权重参数
+    mini_batch = 4000  # 单批数据的处理量
+    batch_size = 10000  # mempool的容量
 
     critic_coef = 0.5  # critic loss 权重
     entropy_coef = 0.01  # entropy loss 权重
@@ -146,7 +148,7 @@ def train():
     """训练过程"""
     # 初始化PPO
     ppo_agent = PPO(state_dim, action_dim, lr_actor, lr_critic, critic_coef, entropy_coef, gamma, use_gae, gae_lambda, k_epochs, eps_clip,
-                    has_continuous_action_space, action_std, use_value_clip)
+                    has_continuous_action_space, action_std, use_value_clip, mini_batch, batch_size)
 
     # 记录训练时间
     start_time = datetime.now().replace(microsecond=0)

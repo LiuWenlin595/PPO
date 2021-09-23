@@ -85,7 +85,7 @@ def test():
 
         for t in range(max_ep_len):
 
-            action = ppo_agent.select_action(state)
+            action, _, _ = ppo_agent.select_action(state)
             state, reward, done, _ = env.step(action)
             ep_reward += reward
 
@@ -95,9 +95,6 @@ def test():
 
             if done:
                 break
-
-        # 删除堆区数据, 不写也没啥事
-        # ppo_agent.buffer.clear()
 
         test_running_reward += ep_reward
         print('Episode: {} \t\t Reward: {}'.format(ep, round(ep_reward, 2)))

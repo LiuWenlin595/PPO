@@ -104,15 +104,6 @@ class PPO:
             action, action_logprob = self.policy_old.act(state)
             state_value = self.policy.critic(state)
 
-        # 因为GAE需要用到这些数据, 而act()只返回action
-        # 所以在这里存一波数据到buffer, reward和done在train文件中存
-        # self.buffer.states.append(state)
-        # self.buffer.actions.append(action)
-        # self.buffer.logprobs.append(action_logprob)
-        # self.buffer.states_value.append(state_value)
-        # print(action, type(action))
-        # print(state, )
-
         if self.has_continuous_action_space:
             return action.detach().cpu().numpy().flatten(), action_logprob, state_value
         else:
@@ -171,9 +162,6 @@ class PPO:
 
         # 将新的权重赋值给policy old
         self.policy_old.load_state_dict(self.policy.state_dict())
-
-        # 清除buffer, 开始下一轮的收集数据训练(改了buffer之后不需要清空了)
-        # self.buffer.clear()
 
     # 计算MiniBatch的GAE, return = V + A(GAE)
     def calc_gae_return(self):
