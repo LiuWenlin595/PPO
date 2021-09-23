@@ -180,8 +180,8 @@ class PPO:
         actions, logprobs, states, next_states, states_value, rewards, is_done = self.buffer.sample()
         returns = []
         for t in range(self.buffer.mini_batch - 1, -1, -1):
-            gae = 0
             if is_done[t] or t == self.buffer.mini_batch - 1:  # episode最后一帧或者batch最后一帧
+                gae = 0
                 next_value = self.policy.critic(torch.FloatTensor(next_states[t]).to(device))
                 delta = rewards[t] + self.gamma * next_value - states_value[t]
             else:
