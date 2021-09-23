@@ -26,15 +26,13 @@ class ActorCritic(nn.Module):
 
         if has_continuous_action_space:
             self.action_dim = action_dim
-            self.action_var = torch.full(
-                (action_dim, ), action_std_init * action_std_init).to(device)
+            self.action_var = torch.full((action_dim, ), action_std_init * action_std_init).to(device)
         """trick3, 正交初始化"""
         """trick8, tanh做激活函数"""
         if use_orth:
-            def init_(m): return init(m, nn.init.orthogonal_,
-                                      lambda x: nn.init.constant_(x, 0), np.sqrt(2))
+            init_ = lambda m: init(m, nn.init.orthogonal_, lambda x: nn.init.constant_(x, 0), np.sqrt(2))
         else:
-            def init_(m): return m
+            init_ = lambda m: m
 
         # actor
         if has_continuous_action_space:
@@ -45,21 +43,16 @@ class ActorCritic(nn.Module):
                                        nn.Softmax(dim=-1))
 
         # critic
-        self.critic = nn.Sequential(init_(nn.Linear(state_dim, 64)), nn.Tanh(), init_(
-            nn.Linear(64, 64)), nn.Tanh(), init_(nn.Linear(64, 1)))
+        self.critic = nn.Sequential(init_(nn.Linear(state_dim, 64)), nn.Tanh(), init_(nn.Linear(64, 64)), nn.Tanh(), init_(nn.Linear(64, 1)))
 
     def set_action_std(self, new_action_std):
         """设置方差"""
         if self.has_continuous_action_space:
-            self.action_var = torch.full(
-                (self.action_dim, ), new_action_std * new_action_std).to(device)
+            self.action_var = torch.full((self.action_dim, ), new_action_std * new_action_std).to(device)
         else:
-            print(
-                "--------------------------------------------------------------------------------------------")
-            print(
-                "WARNING : Calling ActorCritic::set_action_std() on discrete action space policy")
-            print(
-                "--------------------------------------------------------------------------------------------")
+            print("--------------------------------------------------------------------------------------------")
+            print("WARNING : Calling ActorCritic::set_action_std() on discrete action space policy")
+            print("--------------------------------------------------------------------------------------------")
 
     def forward(self):
         raise NotImplementedError
