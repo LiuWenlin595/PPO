@@ -7,54 +7,19 @@ from torch.distributions import Categorical
 
 from network import ActorCritic
 from rollout import RolloutBuffer
-
-# 配置显卡
-device = torch.device('cpu')
-
-if torch.cuda.is_available():
-    device = torch.device('cuda:0')
-    torch.cuda.empty_cache()
-    print("Device set to : " + str(torch.cuda.get_device_name(device)))
-else:
-    print("Device set to : cpu")
+from config import *
 
 
 class PPO:
-    def __init__(self,
-                 state_dim,
-                 action_dim,
-                 lr_actor,
-                 lr_critic,
-                 critic_coef,
-                 entropy_coef,
-                 gamma,
-                 use_gae,
-                 gae_lambda,
-                 k_epochs,
-                 eps_clip,
-                 has_continuous_action_space,
-                 action_std_init=0.6,
-                 use_value_clip=False,
-                 mini_batch=4000,
-                 batch_size=10000):
-
-        self.has_continuous_action_space = has_continuous_action_space
+    def __init__(self, state_dim, action_dim):
 
         if has_continuous_action_space:
-            self.action_std = action_std_init
-
-        self.gamma = gamma
-        self.eps_clip = eps_clip
-        self.k_epochs = k_epochs
-
-        self.use_gae = use_gae
-        self.gae_lambda = gae_lambda
-        self.mini_batch = mini_batch
+            self.action_std = action_std
 
         self.buffer = RolloutBuffer(mini_batch, batch_size)
 
         # 需要用到两个网络, 因为策略比
-        self.policy = ActorCritic(state_dim, action_dim, has_continuous_action_space, action_std_init, use_orth=False).to(device)
+        self.policy = ActorCritic(state_dim, action_dim).to(device)
         self.optimizer = torch.optim.Adam([{
             'params': self.policy.actor.parameters(),
             'lr': lr_actor
@@ -62,19 +27,14 @@ class PPO:
             'params': self.policy.critic.parameters(),
             'lr': lr_critic
         }])
-        self.max_grad_norm = 1
 
-        self.policy_old = ActorCritic(state_dim, action_dim, has_continuous_action_space, action_std_init, use_orth=False).to(device)
+        self.policy_old = ActorCritic(state_dim, action_dim).to(device)
         self.policy_old.load_state_dict(self.policy.state_dict())  # 复制网络
 
-        self.critic_coef = critic_coef
-        self.entropy_coef = entropy_coef
-        self.use_value_clip = use_value_clip
-        self.MseLoss = nn.MSELoss()
+        self.MSEloss = nn.MSELoss()
 
     def set_action_std(self, new_action_std):
-
-        if self.has_continuous_action_space:
+        if has_continuous_action_space:
             self.action_std = new_action_std
             self.policy.set_action_std(new_action_std)
             self.policy_old.set_action_std(new_action_std)
@@ -85,7 +45,7 @@ class PPO:
 
     def decay_action_std(self, action_std_decay_rate, min_action_std):
         print("--------------------------------------------------------------------------------------------")
-        if self.has_continuous_action_space:
+        if has_continuous_action_space:
             self.action_std = self.action_std - action_std_decay_rate
             self.action_std = round(self.action_std, 4)
             if self.action_std <= min_action_std:
@@ -104,14 +64,14 @@ class PPO:
             action, action_logprob = self.policy_old.act(state)
             state_value = self.policy.critic(state)
 
-        if self.has_continuous_action_space:
+        if has_continuous_action_space:
             return action.detach().cpu().numpy().flatten(), action_logprob, state_value
         else:
             return action.item(), action_logprob, state_value
 
     # 更新模型
     def update(self):
-        if self.use_gae:
+        if use_gae:
             returns, actions, logprobs, states = self.calc_gae_return()
         else:
             returns, actions, logprobs, states = self.calc_lambda_return()
@@ -125,7 +85,7 @@ class PPO:
         old_states = torch.squeeze(torch.stack(states, dim=0)).detach().to(device)
 
         # 进行k轮update policy
-        for _ in range(self.k_epochs):
+        for _ in range(k_epochs):
 
             logprobs, state_values, dist_entropy = self.policy.evaluate(old_states, old_actions)
 
@@ -138,26 +98,26 @@ class PPO:
             # 计算PPO的约束loss
             advantages = returns - state_values.detach()
             surr1 = ratios * advantages
-            surr2 = torch.clamp(ratios, 1 - self.eps_clip, 1 + self.eps_clip) * advantages
+            surr2 = torch.clamp(ratios, 1 - eps_clip, 1 + eps_clip) * advantages
             """trick1, value function clipping"""
-            if self.use_value_clip:
+            if use_value_clip:
                 # 0.5就相当于epsilon, 是我瞎写的, 需要根据实际任务而定
                 _, old_state_values, _ = self.policy_old.evaluate(old_states, old_actions)
                 old_state_values = torch.squeeze(old_state_values)
                 value_clip = old_state_values + torch.clamp(state_values - old_state_values, -0.5, 0.5)
-                critic_loss = torch.min(self.MseLoss(state_values, returns), self.MseLoss(value_clip, returns))
+                critic_loss = torch.min(self.MSEloss(state_values, returns), self.MSEloss(value_clip, returns))
             else:
-                critic_loss = self.MseLoss(state_values, returns)
+                critic_loss = self.MSEloss(state_values, returns)
 
             # 总的loss = actor loss + critic loss + entropy loss
-            loss = -torch.min(surr1, surr2) + self.critic_coef * critic_loss - self.entropy_coef * dist_entropy
+            loss = -torch.min(surr1, surr2) + critic_coef * critic_loss - entropy_coef * dist_entropy
 
             # 梯度更新
             self.optimizer.zero_grad()
             loss.mean().backward()
             """trick9, global gradient clipping"""
             # max_grad_norm的值也是我瞎写的
-            # nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
+            # nn.utils.clip_grad_norm_(self.policy.parameters(), max_grad_norm)
             self.optimizer.step()
 
         # 将新的权重赋值给policy old
@@ -171,10 +131,10 @@ class PPO:
             if is_done[t] or t == self.buffer.mini_batch - 1:  # episode最后一帧或者batch最后一帧
                 gae = 0
                 next_value = self.policy.critic(torch.FloatTensor(next_states[t]).to(device))
-                delta = rewards[t] + self.gamma * next_value - states_value[t]
+                delta = rewards[t] + gamma * next_value - states_value[t]
             else:
-                delta = rewards[t] + self.gamma * states_value[t + 1] - states_value[t]
-            gae += self.gamma * self.gae_lambda * delta
+                delta = rewards[t] + gamma * states_value[t + 1] - states_value[t]
+            gae += gamma * gae_lambda * delta
             returns.insert(0, gae + states_value[t])
         return returns, actions, logprobs, states
 
@@ -186,7 +146,7 @@ class PPO:
             lambda_return = 0
             if is_done[t]:  # 遇到done的时候重新计算
                 lambda_return = 0
-            lambda_return = rewards[t] + self.gamma * lambda_return
+            lambda_return = rewards[t] + gamma * lambda_return
             returns.insert(0, lambda_return)
         return returns, actions, logprobs, states
 

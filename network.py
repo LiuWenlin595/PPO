@@ -1,15 +1,10 @@
+import numpy as np
 import torch
 import torch.nn as nn
 from torch.distributions import MultivariateNormal
 from torch.distributions import Categorical
 
-device = torch.device('cpu')
-if torch.cuda.is_available():
-    device = torch.device('cuda:0')
-    torch.cuda.empty_cache()
-    print("Device set to : " + str(torch.cuda.get_device_name(device)))
-else:
-    print("Device set to : cpu")
+from config import *
 
 
 def init(module, weight_init, bias_init, gain=1):
@@ -19,14 +14,14 @@ def init(module, weight_init, bias_init, gain=1):
 
 
 class ActorCritic(nn.Module):
-    def __init__(self, state_dim, action_dim, has_continuous_action_space, action_std_init, use_orth):
+    def __init__(self, state_dim, action_dim):
         super(ActorCritic, self).__init__()
 
         self.has_continuous_action_space = has_continuous_action_space
 
         if has_continuous_action_space:
             self.action_dim = action_dim
-            self.action_var = torch.full((action_dim, ), action_std_init * action_std_init).to(device)
+            self.action_var = torch.full((action_dim, ), action_std * action_std).to(device)
         """trick3, 正交初始化"""
         """trick8, tanh做激活函数"""
         if use_orth:

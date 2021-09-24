@@ -1,14 +1,6 @@
-from os import stat
 import torch
 
-device = torch.device('cpu')
-
-if torch.cuda.is_available():
-    device = torch.device('cuda:0')
-    torch.cuda.empty_cache()
-    print("Device set to : " + str(torch.cuda.get_device_name(device)))
-else:
-    print("Device set to : cpu")
+from config import *
 
 
 class RolloutBuffer:
@@ -58,16 +50,20 @@ class RolloutBuffer:
         states_value = self.states_value[:self.mini_batch]
         rewards = self.rewards[:self.mini_batch]
         is_done = self.is_done[:self.mini_batch]
-        # 删除数据
-        self.actions = self.actions[self.mini_batch:]
-        self.logprobs = self.logprobs[self.mini_batch:]
-        self.states = self.states[self.mini_batch:]
-        self.next_states = self.next_states[self.mini_batch:]
-        self.states_value = self.states_value[self.mini_batch:]
-        self.rewards = self.rewards[self.mini_batch:]
-        self.is_done = self.is_done[self.mini_batch:]
-        self.cur_size -= self.mini_batch
+        # # 删除数据
+        # self.actions = self.actions[self.mini_batch:]
+        # self.logprobs = self.logprobs[self.mini_batch:]
+        # self.states = self.states[self.mini_batch:]
+        # self.next_states = self.next_states[self.mini_batch:]
+        # self.states_value = self.states_value[self.mini_batch:]
+        # self.rewards = self.rewards[self.mini_batch:]
+        # self.is_done = self.is_done[self.mini_batch:]
+        # self.cur_size -= self.mini_batch
         return actions, logprobs, states, next_states, states_value, rewards, is_done
+
+    # 判断buffer是否满
+    def is_full(self):
+        return self.cur_size == self.batch_size
 
     # 清空buffer
     def clear(self):
